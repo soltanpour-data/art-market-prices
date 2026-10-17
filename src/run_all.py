@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS = [
-    "00_generate_sample_data.py",
+    "00_fetch_data.py",
     "01_data_cleaning.py",
     "02_eda.py",
     "03_feature_engineering.py",

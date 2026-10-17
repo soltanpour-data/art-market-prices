@@ -1,54 +1,66 @@
 # Statistical Modeling and Time Series Analysis of Art Market Prices
 
-A reproducible analysis of London painting-auction prices: **predicting auction
-prices** and **explaining price differences across market segments** using
-artist, auction house, artwork characteristics, and sale timing.
+A reproducible analysis of **real historical London painting-auction prices,
+1780–1835**: predicting hammer prices and explaining price differences
+across market segments using artist, auction house, subject matter, and
+sale timing.
 
-The pipeline follows the classic applied-statistics workflow — exploratory
+The data are 137,186 sold lots from the Getty Provenance Index, via the
+public research package
+[mdlincoln/londonauctions](https://github.com/mdlincoln/londonauctions)
+(Matthew Lincoln & Abram Fox, "The Temporal Dimensions of the London Art
+Auction, 1780-1835", *British Art Studies* 4, 2016). Run
+`python src/00_fetch_data.py` once to download it — the pipeline then runs
+offline.
+
+The analysis follows the classic applied-statistics workflow — exploratory
 data analysis, hedonic (multivariate) regression, a quality-adjusted price
-index, and seasonal ARIMA time-series modeling. No black boxes: every result
-is a coefficient, a plot, or a test you can read directly.
+index, and ARIMA time-series modeling. No black boxes: every result is a
+coefficient, a plot, or a test you can read directly.
 
-## Results at a glance (synthetic sample data)
+## Results at a glance
 
 | Analysis | Result |
 |---|---|
-| Hedonic regression | R² = 0.77 — artist, size, signature, provenance and house all significant |
-| Price index | 2005Q1 = 100 → 2015Q4 ≈ 97 (real terms, quality-adjusted) |
-| Time series | SARIMA(1,1,2)×(0,0,0,4) on the log index; 4-quarter forecast with 95% CI |
-| Out-of-sample prediction | Test MAPE ≈ 31.5% (OLS vs ridge on the 2014–2015 holdout) |
-| Segment comparison | F-test confirms price drivers differ by segment (F = 8.4, p < 1e-15) |
+| Hedonic regression | R² = 0.28 — artist, house, subject and timing all significant |
+| Price index | 1780 = 100 → 1835 ≈ 209 (nominal, quality-adjusted) |
+| Time series | ARIMA(0,1,2) on the annual log index; 5-year forecast with 95% CI |
+| Out-of-sample prediction | MdAPE ≈ 72% on the 1825–1835 holdout (OLS vs ridge) |
+| Segment comparison | F-test confirms house premia differ by subject segment (F = 29.5, p ≈ 0) |
 
 ## How to read the results
 
-**What drives prices?** The coefficient plot tells the story: artist identity
-dominates (blue-chip names carry large positive fixed effects), then artwork
-size (elasticity ≈ 0.36 — a 10% larger canvas sells for ≈3.6% more), a
-signature (≈+13%), provenance (≈+6% per recorded entry), and the auction
-house (Christie's/Sotheby's ≈ +10–13% over Bonhams, holding the artwork
-constant).
+**What drives prices?** Artist identity dominates, exactly as art history
+would predict: Poussin (+138%), Claude (+128%) and Canaletti (+116%) carry
+the largest premia, while unattributed ("Anonymous") works sell for ~70%
+less than comparable attributed lots. Auction houses differ sharply too —
+Phillips (+63%) and Coxe (+95%) over the baseline — and so do subjects:
+religious works (+12%) and genre scenes (+11%) outprice portraits (−39%)
+and still lifes (−33%). Sales cluster in the London season (March–July),
+and May lots command a clear seasonal premium.
 
 ![Largest price effects](output/fig_coefficients.png)
 
 **How did the market move?** The hedonic index strips out changes in *what*
-was sold each quarter, leaving the pure time effect. In real terms the
-sample market is roughly flat over 2005–2015 once quality is controlled for —
-the naive median-price path (see `output/fig_quarterly_median.png`) looks
-bumpier because it confounds price changes with mix changes.
+was sold each year, leaving the pure time effect. Nominal prices roughly
+double over the period — but remember these are nominal pounds across the
+Napoleonic wars, so the index confounds real appreciation with wartime
+inflation (see Limitations).
 
 ![Hedonic price index](output/fig_price_index.png)
 
-**Where is it heading?** The log index is non-stationary (ADF p ≈ 0.52), so
-the model differences once and captures the quarterly London sale calendar
-with seasonal ARIMA. Residuals show no leftover autocorrelation (Ljung-Box
-p ≈ 0.56).
+**Where is it heading?** The annual log index is stationary (ADF p ≈ 0.0001),
+and AIC selects a simple ARIMA(0,1,2). Residuals show no leftover
+autocorrelation (Ljung-Box p ≈ 1.0). The 5-year forecast is flat with wide
+bands — honest uncertainty for a thin annual series.
 
 ![Index forecast](output/fig_forecast.png)
 
-**Do segments behave differently?** Yes. Per-segment regressions plus a formal
-F-test on segment interactions reject equal slopes (p < 1e-15): the size
-premium is steepest for Post-War & Contemporary, while the signature premium
-matters most for Old Masters — exactly the pattern art economists expect.
+**Do segments behave differently?** Yes. Per-segment regressions plus a
+formal F-test on segment×house interactions reject equal slopes (p ≈ 0):
+Christie's premium, for instance, is positive for still lifes but negative
+for religious works — the market valued houses differently depending on
+what was on the block.
 
 ## Quickstart
 
@@ -67,35 +79,47 @@ Results land in `output/` (tables, model summaries, figures).
 ├── METHODOLOGY.md             # step-by-step of the analysis
 ├── requirements.txt
 ├── data/
-│   ├── README.md              # data dictionary + how to plug in real data
-│   ├── raw_auction_data.csv   # synthetic lot-level London sales, 2005–2015
-│   ├── clean_auction_data.csv
-│   ├── model_data.csv         # modelling-ready design matrix
-│   └── price_index.csv        # hedonic price index (2005Q1 = 100)
+│   ├── README.md              # data dictionary + source notes
+│   └── (fetched locally, gitignored)
+│       ├── sales.rda                  # raw R data from londonauctions
+│       ├── raw_london_auctions.csv    # 304,788 transactions
+│       ├── clean_london_auctions.csv # 137,186 sold lots with valid prices
+│       ├── model_data.csv             # modelling-ready design matrix
+│       └── price_index.csv            # hedonic price index (1780 = 100)
 ├── src/
 │   ├── run_all.py             # runs the whole pipeline
-│   ├── 00_generate_sample_data.py
-│   ├── 01_data_cleaning.py
+│   ├── 00_fetch_data.py       # downloads & converts the real data
+│   ├── 01_data_cleaning.py    # sold lots, artist/subject parsing, log prices
 │   ├── 02_eda.py
-│   ├── 03_feature_engineering.py
+│   ├── 03_feature_engineering.py  # artist/house/subject/year/month dummies
 │   ├── 04_hedonic_regression.py
 │   ├── 05_price_index.py
 │   ├── 06_time_series.py
-│   ├── 07_prediction.py
+│   ├── 07_prediction.py       # chronological train/test, OLS vs ridge
 │   └── 08_segment_comparison.py
 └── output/                    # figures, model summaries, result tables
 ```
 
 ## Method in brief
 
-1. **Clean** — drop unsold lots, deflate to 2005 GBP, log-transform prices, winsorize outliers.
-2. **Explore** — distributions, prices by house/segment/medium, quarterly medians.
-3. **Engineer features** — dummies for house, medium, artist (fixed effects) and sale quarter; log artwork area; signature, provenance, exhibition counts.
-4. **Hedonic regression** — OLS of log price on characteristics with robust (HC1) standard errors; VIF and residual diagnostics.
-5. **Price index** — quarterly time-dummy coefficients → quality-adjusted index, 2005Q1 = 100.
-6. **Time series** — ADF stationarity test, seasonal ARIMA (quarterly London sale calendar), Ljung-Box diagnostics, 4-quarter forecast.
-7. **Prediction** — chronological train/test split (train ≤ 2013, test 2014–2015); OLS vs ridge, RMSE/MAE/MAPE on the GBP scale.
-8. **Segment comparison** — per-segment hedonic models plus an F-test of segment interactions.
+1. **Fetch** — download the londonauctions `sales` data set (304,788
+   transactions) and convert from R's .rda format.
+2. **Clean** — keep sold lots with valid positive prices (137,186); parse
+   primary artist; classify catalogue titles into 8 subject segments with a
+   documented keyword rule; log-transform and lightly winsorize prices.
+3. **Explore** — price distributions, prices by house/subject, lots per year.
+4. **Engineer features** — dummies for the top-40 artists, top-10 houses,
+   subjects, sale years and months.
+5. **Hedonic regression** — OLS of log price on characteristics with robust
+   (HC1) standard errors; VIF and residual diagnostics.
+6. **Price index** — annual time-dummy coefficients → quality-adjusted index,
+   1780 = 100.
+7. **Time series** — ADF stationarity test, ARIMA by AIC, Ljung-Box
+   diagnostics, 5-year forecast.
+8. **Prediction** — chronological split (train ≤ 1824, test 1825–1835); OLS
+   vs ridge, robust metrics on the GBP scale.
+9. **Segment comparison** — per-segment hedonic models plus an F-test of
+   segment interactions on house premia.
 
 Full detail: [METHODOLOGY.md](METHODOLOGY.md).
 
@@ -103,35 +127,42 @@ Full detail: [METHODOLOGY.md](METHODOLOGY.md).
 
 - **Log prices.** Art prices are log-normal; modelling in logs both stabilises
   variance and turns coefficients into readable percentage effects.
-- **Robust standard errors.** Price variance is not constant (heteroscedastic),
-  so the regression reports HC1 robust standard errors rather than classical ones.
-- **Artist fixed effects absorb segment effects.** Each artist belongs to
-  exactly one segment, so segment dummies would be perfectly collinear —
-  they are omitted wherever artist dummies are present.
+- **Robust standard errors.** Price variance is not constant
+  (heteroscedastic), so the regression reports HC1 robust standard errors
+  rather than classical ones.
+- **Median-based prediction metrics.** ~47% of lots sell for under £2, so
+  MAPE explodes (a £1 miss on a 50p lot is a 200% error). MdAPE (71.6%) and
+  log-scale RMSE (1.47) are the honest headline numbers; median bias is just
+  £0.35.
 - **No leakage in prediction.** The test set is strictly later in time than
-  the training set, and quarterly dummies are replaced by year+season dummies
-  so no future information enters training.
+  the training set, and annual dummies are replaced by a year trend plus
+  month dummies so no future information enters training.
 - **Back-transformation.** GBP-scale metrics use the naive retransformation
   `exp(predicted log price)`. Duan's smearing correction was tested and
   rejected: under heteroscedastic errors a single global factor over-corrects
-  and worsened out-of-sample MAPE (31.5% → 35.0%).
-
-## Data note
-
-The bundled data is **synthetic** (seeded, so fully reproducible) with the
-structure of real auction results — 4,000 lots across Christie's, Sotheby's
-and Bonhams, 2005–2015. To run on real data, replace
-`data/raw_auction_data.csv` with actual lot-level results following the
-schema in [data/README.md](data/README.md) and re-run from step 01.
+  and worsened out-of-sample error.
 
 ## Limitations
 
-- Only sold lots are observed (unsold "bought-in" lots are censored) — a
+- Prices are **nominal pounds** — no historical deflator is applied, so the
+  index mixes real price changes with Napoleonic-era inflation. Within-year
+  hedonic *comparisons* (the coefficients) are unaffected, since year
+  dummies absorb the price level.
+- Only sold lots are observed (bought-in/withdrawn lots are censored) — a
   classic selection issue in art-market research.
-- The index controls for observed characteristics only; taste, hype and
-  condition live in the residuals.
+- Subject classification is a keyword rule on 18th-century catalogue prose;
+  34% of lots fall into "other".
+- The index controls for observed characteristics only; condition,
+  provenance and buyer competition live in the residuals.
 - Thin data for minor artists makes individual artist effects noisy.
 
 ## License
 
 MIT — see LICENSE.
+
+## Data citation
+
+Lincoln, Matthew & Fox, Abram (2016). "The Temporal Dimensions of the
+London Art Auction, 1780-1835." *British Art Studies* 4. Data: Getty
+Provenance Index, via https://github.com/mdlincoln/londonauctions
+(archived on Zenodo, DOI 10.5281/zenodo.60284).

@@ -1,100 +1,113 @@
 # Methodology
 
-Step-by-step of the analysis, in the order the code runs
-(`python src/run_all.py`). Written for a reader with a mathematics /
-statistics background — no machine-learning machinery required.
+Step-by-step account of the analysis, so every choice is inspectable.
+Numbers below are the values produced by the current run.
 
-## 0. Data assembly (`00_generate_sample_data.py`)
+## 0. Data (`00_fetch_data.py`)
 
-Lot-level auction results, one row per lot: artist, hammer price, sale date,
-auction house, medium, dimensions, signature, provenance and exhibition
-counts. The bundled file is synthetic but mirrors the shape of real London
-sale results (Christie's, Sotheby's, Bonhams, 2005–2015).
+Real transaction data: the `sales` data frame from
+[mdlincoln/londonauctions](https://github.com/mdlincoln/londonauctions)
+(Lincoln & Fox 2016), itself transcribed from the Getty Provenance Index's
+British sales catalogues, 1780–1835. Downloaded once (~5 MB .rda) and
+converted to CSV with `pyreadr`. The CSVs live in `data/` but are gitignored
+— anyone can regenerate them with this script.
 
 ## 1. Cleaning (`01_data_cleaning.py`)
 
-- **Unsold lots** are dropped — they have no price (censored data), and are
-  disclosed as a limitation rather than silently imputed.
-- Prices are **deflated to constant 2005 GBP** with the UK CPI so the index
-  measures real appreciation.
-- Art prices are **log-normal**, so modelling happens on `log(price)`;
-  coefficients then read as percentage effects.
-- Log prices are **winsorized** at the 0.5/99.5 percentiles against
-  data-entry errors and trophy lots.
+- **Sample**: `transaction_type == "sold"` with a valid positive
+  `transaction_amt` (decimal pounds; guineas already converted). 304,788
+  raw transactions → 166,897 non-sold dropped → 705 missing/zero prices
+  dropped → **137,186 lots**.
+- **Artist**: the `artists` field lists attributions separated by `;`
+  (catalogues list the principal attribution first); the primary one is
+  kept, brackets stripped (`[Anonymous]` → `Anonymous`).
+- **Subject**: the catalogue `title` is classified into 8 market segments
+  with a documented keyword rule (see `SUBJECT_RULES` in the script):
+  religious, mythological, portrait, landscape, still_life, animal, genre,
+  other. Priority order resolves multi-matches (e.g. "A Nymph asleep, in a
+  Landscape" → mythological). Resulting mix: other 34%, landscape 30%,
+  portrait 12%, religious 10%, genre/mythological/still_life/animal the rest.
+- **Prices**: log-transformed (log-normal distribution) and winsorized at
+  the 0.5/99.5 percentiles (1,369 lots) against data-entry errors. Prices
+  are **nominal** pounds — see Limitations in the README.
 
-## 2. Exploration (`02_eda.py`)
+## 2. EDA (`02_eda.py`)
 
-Distributions, boxplots of log price by auction house / segment / medium,
-and a naive quarterly median-price path — the "before" picture that the
-hedonic index will improve on.
+Median price £2.30; mean £13.92 — heavily right-skewed, hence logs.
+Christie's dominates volume (114k of 305k raw transactions); Foster and
+Phillips follow. Sales are strongly seasonal: March–July is the London
+season, August–October nearly dead (month dummies capture this).
 
-## 3. Feature engineering (`03_feature_engineering.py`)
+## 3. Features (`03_feature_engineering.py`)
 
-- Categorical variables → dummy variables with explicit baselines
-  (Bonhams; Old Masters; works on paper; 2005Q1).
-- **Artist fixed effects**: one dummy per artist — artist identity is the
-  dominant price driver, and fixed effects absorb segment and tier
-  differences automatically.
-- **Time**: quarterly dummies for the index regression; year + season
-  dummies for prediction (future quarters must never leak into training).
-- Continuous: log artwork area (size elasticity), signature flag,
-  provenance and exhibition counts.
+- Artists: fixed-effect dummies for the 40 most-traded artists
+  (`Anonymous`, Rubens, Teniers, Rembrandt, Titian, ...); everyone else →
+  `Other` baseline. 40 dummies on 137k rows is easily estimable and absorbs
+  school/period differences alongside name recognition.
+- Houses: dummies for the 10 largest houses (`Other` baseline).
+- Subjects: dummies for all 8 segments (`other` baseline).
+- Time: annual dummies 1781–1835 (1780 baseline) for the index; a numeric
+  `year_trend` + month dummies for prediction (no future leakage).
+- Final design matrix: **137,186 × 123 features**.
 
 ## 4. Hedonic regression (`04_hedonic_regression.py`)
 
-The workhorse:
+`log(price_i) = X_i β + ε_i`, OLS with **HC1 heteroscedasticity-robust**
+standard errors. R² = **0.275** (adj. 0.275) — modest, as expected for noisy
+historical catalogue data: condition, size, medium and buyer competition
+are unobserved and live in the residuals.
 
-```
-log(price_i) = X_i β + ε_i
-```
+Headline effects (all p < 0.001 unless noted):
+- Artists: Poussin +138%, Claude +128%, Canaletti +116%; Anonymous −70%.
+- Houses: Coxe +95%, Phillips +63%; Southgate −75%, Wheatley −71%.
+- Subjects: religious +12%, genre +11%; still life −33%, portrait −39%.
+- Season: May +75% vs January (the London season effect).
 
-OLS with **heteroscedasticity-robust (HC1) standard errors**, since price
-variance is not constant. Diagnostics: R² / adjusted R², variance inflation
-factors, residuals-vs-fitted plot. A coefficient of 0.12 on `signed` means a
-signature is associated with ≈12% higher price, holding everything else fixed.
+Diagnostics: VIFs on house/subject dummies all < 5 (no multicollinearity;
+artists span houses, years and subjects, so no nesting issue); residual plot
+shows mild heteroscedasticity, hence the robust SEs.
 
 ## 5. Price index (`05_price_index.py`)
 
-The quarterly time-dummy coefficients are the pure time effect — price
-movement with artwork mix held constant:
-
-```
-Index_t = 100 · exp(β_t − β_base),   base quarter 2005Q1 = 100
-```
-
-This is the standard hedonic-index construction from the art-economics
-literature.
+`Index_t = 100 · exp(β_t)` from the annual time dummies — the pure time
+effect holding artist, house, subject and season constant. 1780 = 100 →
+1835 ≈ **209** (nominal). The naive annual-median path is bumpier because it
+confounds price changes with mix changes.
 
 ## 6. Time series (`06_time_series.py`)
 
-- **ADF test** for stationarity (difference if the unit root is not rejected).
-- **Seasonal ARIMA** on the log index, order chosen by AIC grid search with
-  seasonal period 4 — the London sale calendar (Feb / Jun–Jul / Nov–Dec)
-  creates genuine quarterly seasonality.
-- **Ljung-Box** check that no autocorrelation is left in the residuals.
-- 4-quarter forecast with 95% confidence intervals.
+- ADF test on the log index: statistic −4.68, **p = 0.0001** → stationary,
+  no unit root.
+- Grid search over ARIMA(p,d,q), p,q ∈ {0,1,2}, d ∈ {0,1} by AIC → best is
+  **ARIMA(0,1,2), AIC = 15.6**. (Annual data → no seasonal component.)
+- Ljung-Box p ≈ 1.0 → no leftover autocorrelation.
+- 5-year forecast (1836–1840): flat at ≈ 236 index points with wide 95%
+  bands — the honest answer for a 56-point annual series.
 
 ## 7. Prediction (`07_prediction.py`)
 
-A **chronological** train/test split — train on sales up to 2013, test on
-2014–2015 (shuffling time-series data would leak the future). Compares OLS
-against ridge regression (alpha by cross-validation), evaluated on the
-original GBP scale with RMSE, MAE and MAPE after back-transformation.
-Duan's smearing correction was tested and rejected (see the comment in
-`07_prediction.py`): under heteroscedastic errors it worsened out-of-sample
-performance, so the naive retransformation is used.
+Chronological split: train on ≤ 1824 (86,525 lots), test on 1825–1835
+(50,661 lots) — never shuffled. Annual dummies are replaced by `year_trend`
+so future years can't leak into training; two house dummies with zero
+training variance are dropped. OLS vs ridge (α chosen by CV = 162).
+
+Test performance: R² = 0.199 on the log scale; **MdAPE 71.6%**, log-RMSE
+1.47, median bias £0.35. OLS and ridge are virtually identical — with
+137k rows and 100+ dummies there is little left for shrinkage to fix, and
+the errors are dominated by idiosyncratic variation (condition, exact
+attribution wording) that the features can't see. The plain MAPE (248%)
+is reported but misleading: 47% of lots sell under £2, where tiny absolute
+misses become huge percentage errors.
+
+Back-transformation is naive `exp(predicted log price)`; Duan's smearing
+correction was tested and rejected (worsened error under heteroscedasticity).
 
 ## 8. Segment comparison (`08_segment_comparison.py`)
 
-- The hedonic model is fit **separately** within Old Masters,
-  Impressionist & Modern, and Post-War & Contemporary, so each segment's
-  price drivers can be read off directly.
-- An **F-test** of segment interactions formally tests whether the drivers
-  differ across segments (H₀: same slopes everywhere).
-
-## What this does not do
-
-No neural networks, no gradient boosting, no text mining — deliberately.
-The questions (what drives prices? how do segments differ? where is the
-market heading?) are answered more transparently with regression and
-classical time-series tools, which is also what the underlying thesis used.
+- Per-subject hedonic fits: R² ranges from 0.19 (still life) to 0.28
+  (religious) — characteristics explain prices differently per segment.
+- F-test of segment × house-premium interactions vs the pooled model:
+  **F = 29.5, p ≈ 0** → house premia differ significantly across subject
+  segments (e.g. Christie's is +24% for still lifes but −47% for religious
+  works, relative to baseline). Artists are not nested in subjects, so the
+  interactions are identified.

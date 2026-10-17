@@ -1,12 +1,14 @@
 """
 Step 7 — Out-of-sample price prediction.
 
-Chronological train/test split (train: sales up to 2013, test: 2014-2015 —
+Chronological train/test split (train: sales up to 1824, test: 1825-1835 —
 time series data must never be shuffled). Compares plain OLS against ridge
-regression. Uses year + season dummies instead of quarterly dummies so no
-future information leaks into training.
+regression. Time enters as a numeric trend plus month dummies (annual
+dummies would leak future years into training).
 
 Metrics are reported on the original GBP scale after back-transformation.
+Duan's smearing correction was tested and rejected (see comment in metrics):
+with heteroscedastic errors it worsened out-of-sample MAPE.
 
 Output: output/prediction_comparison.csv
 """
@@ -19,45 +21,44 @@ from sklearn.preprocessing import StandardScaler
 
 df = pd.read_csv("data/model_data.csv")
 
-meta = ["lot_id", "artist", "segment", "sale_year", "sale_quarter",
-        "sale_quarter_label", "log_real_price", "real_price_gbp"]
-# Drop quarterly dummies (they would leak future quarters); keep year+season.
-# Segment dummies are dropped too: artist fixed effects already determine
-# the segment, so including both makes the matrix rank-deficient.
-drop_q = [c for c in df.columns if c.startswith("q_")]
-drop_seg = [c for c in df.columns if c.startswith("seg_")]
-X_all = df.drop(columns=meta + drop_q + drop_seg)
-y_log = df["log_real_price"]
-y_gbp = df["real_price_gbp"]
+meta = ["artist", "subject", "auction_house", "sale_year", "sale_month",
+        "log_price", "price_gbp", "year_trend"]
+# Drop annual dummies (they would leak future years); keep the trend
+drop_y = [c for c in df.columns if c.startswith("y_")]
+X_all = df.drop(columns=meta + drop_y)
+y_log = df["log_price"]
+y_gbp = df["price_gbp"]
 
-train = df["sale_year"] <= 2013
+train = df["sale_year"] <= 1824
 Xtr, Xte = X_all[train], X_all[~train]
-# Year dummies for 2014/2015 are all-zero in training -> drop zero-variance
-# columns (rank-deficient design matrix) from both splits.
+# Drop zero-variance columns in training (e.g. artists absent before 1825)
 nzv = Xtr.columns[Xtr.nunique() <= 1]
 if len(nzv):
     print(f"Dropped {len(nzv)} zero-variance columns: {list(nzv)}")
 Xtr, Xte = Xtr.drop(columns=nzv), Xte.drop(columns=nzv)
 ytr_log, yte_log = y_log[train], y_log[~train]
 yte_gbp = y_gbp[~train]
-print(f"Train: {train.sum():,} lots (<=2013) | Test: {(~train).sum():,} lots (2014-2015)")
+print(f"Train: {train.sum():,} lots (<=1824) | Test: {(~train).sum():,} lots (1825-1835)")
 
 
-def metrics(y_true_gbp, pred_log):
-    # Naive back-transformation exp(pred). The textbook alternative, Duan's
-    # smearing correction (multiply by mean(exp(train residuals))), was tried
-    # and *rejected*: with heteroscedastic errors — which the HC1 standard
-    # errors in step 04 already diagnose — a single global smearing factor
-    # over-corrects and worsened test MAPE (31.5% -> 35.0%) and bias.
-    # Under heteroscedasticity the correction must vary with X; the naive
-    # retransformation is the honest, better-performing choice here.
+def metrics(y_true_gbp, pred_log, y_true_log):
+    # Naive back-transformation. Duan's smearing (multiplying by
+    # mean(exp(train residuals))) was tried and rejected: with
+    # heteroscedastic errors a single global factor over-corrects and
+    # worsened test MAPE here.
+    # MAPE explodes because ~47% of lots sell under £2 (a £1 miss on a
+    # 50p lot is a 200% error), so the median-based MdAPE is the honest
+    # headline metric alongside log-scale RMSE.
     pred_gbp = np.exp(pred_log)
     err = y_true_gbp - pred_gbp
+    ape = np.abs(err / y_true_gbp)
     return {
         "RMSE_GBP": float(np.sqrt(np.mean(err ** 2))),
         "MAE_GBP": float(np.mean(np.abs(err))),
-        "MAPE_%": float(np.mean(np.abs(err / y_true_gbp)) * 100),
-        "mean_bias_GBP": float(np.mean(err)),
+        "MAPE_%": float(np.mean(ape) * 100),
+        "MdAPE_%": float(np.median(ape) * 100),
+        "RMSE_log": float(np.sqrt(np.mean((y_true_log - pred_log) ** 2))),
+        "median_bias_GBP": float(np.median(err)),
     }
 
 
@@ -67,14 +68,14 @@ results = {}
 Xtr_c = sm.add_constant(Xtr, has_constant="add").astype(float)
 Xte_c = sm.add_constant(Xte, has_constant="add").astype(float)
 ols = sm.OLS(ytr_log, Xtr_c).fit()
-results["OLS"] = metrics(yte_gbp, ols.predict(Xte_c))
+results["OLS"] = metrics(yte_gbp, ols.predict(Xte_c), yte_log)
 print(f"OLS      test R2 (log scale): {1 - np.var(yte_log - ols.predict(Xte_c)) / np.var(yte_log):.3f}")
 
 # Ridge (standardised features, alpha chosen by cross-validation)
 scaler = StandardScaler().fit(Xtr)
 ridge = RidgeCV(alphas=np.logspace(-2, 3, 20)).fit(scaler.transform(Xtr), ytr_log)
 results[f"Ridge (alpha={ridge.alpha_:.3g})"] = metrics(
-    yte_gbp, ridge.predict(scaler.transform(Xte)))
+    yte_gbp, ridge.predict(scaler.transform(Xte)), yte_log)
 print(f"Ridge CV-chosen alpha: {ridge.alpha_:.4g}")
 
 comp = pd.DataFrame(results).T.round(2)

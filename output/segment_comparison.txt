@@ -1,30 +1,107 @@
---- Post-War & Contemporary (n=1,255) ---
-R-squared: 0.658
-  log_area               coef=+0.451  p=3.73e-136
-  signed                 coef=+0.085  p=0.000141
-  provenance_count       coef=+0.052  p=7.66e-10
-  exhibition_count       coef=+0.060  p=6.88e-09
-  house_Christie's       coef=+0.147  p=7.27e-08
-  house_Sotheby's        coef=+0.150  p=3.84e-08
+--- animal (n=3,205) ---
+R-squared: 0.230
+  house_Christie's             coef=-0.053  p=0.66
+  house_Coxe (Peter)           coef=+0.424  p=0.0449
+  house_Foster (Edward)        coef=-0.895  p=2.94e-12
+  house_Greenwood              coef=+0.910  p=0.00689
+  house_Phillips (Harry)       coef=+0.458  p=0.00404
+  house_Sotheby's              coef=-0.797  p=0.000563
+  house_Southgate (James Webber) coef=-1.085  p=7.78e-05
+  house_Squibb (George)        coef=+0.908  p=0.0404
+  house_Stanley (George)       coef=+0.027  p=0.944
+  house_Wheatley               coef=-1.341  p=0.000519
 
---- Impressionist & Modern (n=1,278) ---
-R-squared: 0.646
-  log_area               coef=+0.366  p=6.79e-102
-  signed                 coef=+0.095  p=1.48e-05
-  provenance_count       coef=+0.053  p=3.04e-10
-  exhibition_count       coef=+0.037  p=0.000107
-  house_Christie's       coef=+0.147  p=1.09e-07
-  house_Sotheby's        coef=+0.092  p=0.000828
+--- genre (n=6,681) ---
+R-squared: 0.255
+  house_Christie's             coef=+0.054  p=0.498
+  house_Coxe (Peter)           coef=+0.765  p=1.12e-07
+  house_Foster (Edward)        coef=-0.752  p=4.34e-20
+  house_Greenwood              coef=+0.554  p=0.0603
+  house_Phillips (Harry)       coef=+0.751  p=1.4e-13
+  house_Sotheby's              coef=-0.857  p=1.14e-06
+  house_Southgate (James Webber) coef=-0.800  p=3.42e-05
+  house_Squibb (George)        coef=+0.243  p=0.336
+  house_Stanley (George)       coef=+0.532  p=0.00517
+  house_Wheatley               coef=-1.090  p=2.53e-05
 
---- Old Masters (n=1,148) ---
-R-squared: 0.671
-  log_area               coef=+0.259  p=3.29e-51
-  signed                 coef=+0.200  p=3.57e-18
-  provenance_count       coef=+0.057  p=1.63e-11
-  exhibition_count       coef=+0.057  p=3.41e-08
-  house_Christie's       coef=+0.153  p=6.5e-08
-  house_Sotheby's        coef=+0.123  p=1e-05
+--- landscape (n=41,231) ---
+R-squared: 0.248
+  house_Christie's             coef=-0.021  p=0.5
+  house_Coxe (Peter)           coef=+0.527  p=6.77e-19
+  house_Foster (Edward)        coef=-0.748  p=7.78e-117
+  house_Greenwood              coef=+0.108  p=0.28
+  house_Phillips (Harry)       coef=+0.568  p=2.2e-45
+  house_Sotheby's              coef=-0.392  p=2.61e-08
+  house_Southgate (James Webber) coef=-1.205  p=8.42e-51
+  house_Squibb (George)        coef=+0.617  p=1.07e-10
+  house_Stanley (George)       coef=+0.383  p=1.27e-06
+  house_Wheatley               coef=-0.901  p=6.98e-17
+
+--- mythological (n=4,704) ---
+R-squared: 0.239
+  house_Christie's             coef=-0.563  p=2.35e-09
+  house_Coxe (Peter)           coef=+0.052  p=0.76
+  house_Foster (Edward)        coef=-1.171  p=5.54e-30
+  house_Greenwood              coef=-0.304  p=0.269
+  house_Phillips (Harry)       coef=+0.249  p=0.0474
+  house_Sotheby's              coef=-0.678  p=0.0196
+  house_Southgate (James Webber) coef=-1.600  p=2.45e-08
+  house_Squibb (George)        coef=-0.449  p=0.124
+  house_Stanley (George)       coef=-0.223  p=0.402
+  house_Wheatley               coef=-1.148  p=0.000111
+
+--- other (n=46,937) ---
+R-squared: 0.231
+  house_Christie's             coef=-0.089  p=0.00139
+  house_Coxe (Peter)           coef=+0.526  p=2.51e-25
+  house_Foster (Edward)        coef=-0.904  p=6.42e-207
+  house_Greenwood              coef=+0.034  p=0.681
+  house_Phillips (Harry)       coef=+0.357  p=4.44e-22
+  house_Sotheby's              coef=-0.696  p=1.36e-33
+  house_Southgate (James Webber) coef=-1.315  p=8.13e-85
+  house_Squibb (George)        coef=+0.243  p=0.00666
+  house_Stanley (George)       coef=+0.367  p=4.58e-06
+  house_Wheatley               coef=-0.933  p=1.45e-52
+
+--- portrait (n=16,918) ---
+R-squared: 0.209
+  house_Christie's             coef=+0.042  p=0.391
+  house_Coxe (Peter)           coef=+0.369  p=2.97e-05
+  house_Foster (Edward)        coef=-0.608  p=2.09e-30
+  house_Greenwood              coef=+0.831  p=1.95e-11
+  house_Phillips (Harry)       coef=+0.685  p=9.62e-24
+  house_Sotheby's              coef=-0.538  p=2.65e-08
+  house_Southgate (James Webber) coef=-0.867  p=2.9e-17
+  house_Squibb (George)        coef=+0.010  p=0.938
+  house_Stanley (George)       coef=+0.256  p=0.0688
+  house_Wheatley               coef=-0.856  p=2.54e-13
+
+--- religious (n=13,464) ---
+R-squared: 0.283
+  house_Christie's             coef=-0.638  p=2.95e-33
+  house_Coxe (Peter)           coef=+0.366  p=0.000195
+  house_Foster (Edward)        coef=-1.339  p=2.22e-116
+  house_Greenwood              coef=-0.455  p=0.00205
+  house_Phillips (Harry)       coef=+0.105  p=0.125
+  house_Sotheby's              coef=-1.450  p=1.56e-21
+  house_Southgate (James Webber) coef=-1.898  p=6.13e-26
+  house_Squibb (George)        coef=-0.003  p=0.983
+  house_Stanley (George)       coef=+0.175  p=0.131
+  house_Wheatley               coef=-2.059  p=2.5e-31
+
+--- still_life (n=4,046) ---
+R-squared: 0.194
+  house_Christie's             coef=+0.216  p=0.0187
+  house_Coxe (Peter)           coef=+0.635  p=0.00151
+  house_Foster (Edward)        coef=-0.318  p=0.000896
+  house_Greenwood              coef=+0.792  p=0.0478
+  house_Phillips (Harry)       coef=+0.655  p=2.67e-07
+  house_Sotheby's              coef=-0.137  p=0.514
+  house_Southgate (James Webber) coef=-0.692  p=0.000354
+  house_Squibb (George)        coef=+0.237  p=0.412
+  house_Stanley (George)       coef=+1.068  p=3.89e-05
+  house_Wheatley               coef=+0.064  p=0.791
 
 F-test: pooled model vs segment-interacted model
-F = 8.43, p-value = 5.91e-16
--> Segment differences are statistically significant.
+F = 29.49, p-value = 0
+-> Auction-house premia differ significantly across subject segments.
