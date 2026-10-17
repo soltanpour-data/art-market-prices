@@ -1,0 +1,30 @@
+--- Post-War & Contemporary (n=1,255) ---
+R-squared: 0.658
+  log_area               coef=+0.451  p=3.73e-136
+  signed                 coef=+0.085  p=0.000141
+  provenance_count       coef=+0.052  p=7.66e-10
+  exhibition_count       coef=+0.060  p=6.88e-09
+  house_Christie's       coef=+0.147  p=7.27e-08
+  house_Sotheby's        coef=+0.150  p=3.84e-08
+
+--- Impressionist & Modern (n=1,278) ---
+R-squared: 0.646
+  log_area               coef=+0.366  p=6.79e-102
+  signed                 coef=+0.095  p=1.48e-05
+  provenance_count       coef=+0.053  p=3.04e-10
+  exhibition_count       coef=+0.037  p=0.000107
+  house_Christie's       coef=+0.147  p=1.09e-07
+  house_Sotheby's        coef=+0.092  p=0.000828
+
+--- Old Masters (n=1,148) ---
+R-squared: 0.671
+  log_area               coef=+0.259  p=3.29e-51
+  signed                 coef=+0.200  p=3.57e-18
+  provenance_count       coef=+0.057  p=1.63e-11
+  exhibition_count       coef=+0.057  p=3.41e-08
+  house_Christie's       coef=+0.153  p=6.5e-08
+  house_Sotheby's        coef=+0.123  p=1e-05
+
+F-test: pooled model vs segment-interacted model
+F = 8.43, p-value = 5.91e-16
+-> Segment differences are statistically significant.

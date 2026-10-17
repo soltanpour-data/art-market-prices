@@ -1,0 +1,84 @@
+"""
+Step 4 — Hedonic regression (the core of the thesis).
+
+    log(price_i) = X_i * beta + epsilon_i
+
+OLS with heteroscedasticity-robust standard errors (HC1), because art
+prices typically show non-constant variance. Includes quarterly time
+dummies so script 05 can build a quality-adjusted price index from them.
+Diagnostics: R-squared, variance inflation factors (VIF), residual plot.
+
+Output: output/hedonic_regression_summary.txt,
+        output/hedonic_coefficients.csv, output/fig_residuals.png
+"""
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import statsmodels.api as sm
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+df = pd.read_csv("data/model_data.csv")
+
+meta = ["lot_id", "artist", "segment", "sale_year", "sale_quarter",
+        "sale_quarter_label", "log_real_price", "real_price_gbp"]
+X = df.drop(columns=meta)
+# Quarterly dummies already span year+season effects, so year/season dummies
+# are out. Artist fixed effects absorb segment effects (each artist belongs
+# to exactly one segment), so segment dummies are out as well — otherwise
+# the design matrix is rank-deficient.
+X = X.drop(columns=[c for c in X.columns
+                    if c.startswith(("y_", "s_", "seg_"))])
+y = df["log_real_price"]
+X = sm.add_constant(X, has_constant="add").astype(float)
+
+model = sm.OLS(y, X).fit(cov_type="HC1")   # robust standard errors
+print(model.summary())
+
+with open("output/hedonic_regression_summary.txt", "w") as f:
+    f.write(str(model.summary()))
+
+coefs = pd.DataFrame({
+    "variable": model.params.index,
+    "coef": model.params.values,
+    "std_err": model.bse.values,
+    "p_value": model.pvalues.values,
+}).sort_values("p_value")
+coefs.to_csv("output/hedonic_coefficients.csv", index=False)
+
+print(f"\nR-squared: {model.rsquared:.3f} | adj. R-squared: {model.rsquared_adj:.3f}")
+
+# VIF on the non-dummy regressors (dummies inflate each other's VIF by design)
+core = ["log_area", "signed", "provenance_count", "exhibition_count"]
+vif = pd.DataFrame({"variable": core,
+                    "VIF": [variance_inflation_factor(X[core].values, i)
+                            for i in range(len(core))]})
+print("\nVIF (values > 10 signal multicollinearity):")
+print(vif.to_string(index=False))
+
+# Residuals vs fitted
+fig, ax = plt.subplots(figsize=(7, 4.5))
+ax.scatter(model.fittedvalues, model.resid, s=6, alpha=0.3)
+ax.axhline(0, color="red", lw=1)
+ax.set_title("Residuals vs fitted (hedonic OLS)")
+ax.set_xlabel("Fitted log price"); ax.set_ylabel("Residuals")
+fig.tight_layout(); fig.savefig("output/fig_residuals.png"); plt.close(fig)
+
+# Coefficient plot: the 15 largest non-time effects with 95% CI.
+# (Quarter dummies are excluded here — they belong to the price index.)
+plot_df = coefs[~coefs["variable"].str.startswith(("q_", "const"))].copy()
+plot_df["abs_coef"] = plot_df["coef"].abs()
+plot_df = plot_df.nlargest(15, "abs_coef").sort_values("coef")
+y_pos = range(len(plot_df))
+fig, ax = plt.subplots(figsize=(8, 6))
+ax.errorbar(plot_df["coef"], y_pos,
+            xerr=1.96 * plot_df["std_err"], fmt="o", capsize=3)
+ax.set_yticks(list(y_pos)); ax.set_yticklabels(plot_df["variable"], fontsize=8)
+ax.axvline(0, color="red", lw=1)
+ax.set_title("Hedonic regression: largest price effects (95% CI)")
+ax.set_xlabel("Coefficient (change in log price)")
+fig.tight_layout(); fig.savefig("output/fig_coefficients.png"); plt.close(fig)
+
+print("\nSaved summary, coefficients, residual and coefficient plots to output/")
